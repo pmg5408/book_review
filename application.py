@@ -120,8 +120,11 @@ def review(bookName):
         rt = request.form.get('rating')
         rv = request.form.get('review')
 
+        a = db.execute(text("SELECT * FROM books WHERE (title = :title)"),
+                            {"title": bookName}).fetchone()
 
-        if session["rating"] == 0:
+
+        if session["rating"] == 0 and a != None:
 
             db.execute(text("UPDATE books SET rating = :rating, review = :review, username = :username WHERE title = :bookName"),
                         {"rating": rt, "review": rv, "username": session["username"], "bookName": bookName})
