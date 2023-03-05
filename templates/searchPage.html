@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+
+{% block heading %}
+BookReviews
+{% endblock %}
+
+{% block body %}
+<p>USER: {{session["username"]}}</p>
+<p>click below to logout</p>
+<a href="{{url_for('logout')}}">Logout</a>
+
+<P>Enter the book name, ISBN number or Author name below</P>
+
+<form action="{{ url_for('searchPage') }}" method="post">
+    <input type="text" name="bookInfo" placeholder="Enter book details">
+    <button>Submit</button>
+</form> 
+
+{%if searchRes is not none%}
+<ul>
+    {% for res in searchRes %}
+        <li><a href="{{url_for('review', bookName = res)}}">{{res}}</a></li>
+    {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}
+

@@ -1,0 +1,11 @@
+{% extends "layout.html" %}
+
+{% block heading %}
+You are logged out
+{% endblock %}
+
+{% block body %}
+<p>USER: {{session["username"]}}</p>
+<p> click below to login again</p>
+<a href = "/loginPage"> Login </a>
+{% endblock %}

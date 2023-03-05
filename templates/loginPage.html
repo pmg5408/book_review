@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+
+{% block heading %}
+Login page
+{% endblock %}
+
+{% block body %}
+
+    <p>Enter your login details below:</p>
+    <form action="{{ url_for('loginPage') }}" method="post">
+        <input type="text" name="username" placeholder="Enter a username">
+        <input type="password" name="password" placeholder="enter a password">
+        <button>Login</button>
+    </form>    
+
+    <form action="{{ url_for('logout') }}">
+        <button>Logout</button>
+    </form> 
+
+
+{% endblock %}
