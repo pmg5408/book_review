@@ -11,3 +11,9 @@ CREATE TABLE books (
     author VARCHAR NOT NULL,
     year VARCHAR NOT NULL
 );
+
+ALTER TABLE books ADD rating VARCHAR;
+
+ALTER TABLE books ADD review VARCHAR(120);
+
+ALTER TABLE books ADD username VARCHAR;

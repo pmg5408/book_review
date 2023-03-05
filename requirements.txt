@@ -2,3 +2,15 @@ Flask
 Flask-Session
 psycopg2-binary
 SQLAlchemy
+render_template
+request
+jsonify
+create_engine
+scoped_session
+sessionmaker
+text 
+create_engine
+Session
+os
+url_for
+flash
