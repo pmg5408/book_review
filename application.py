@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Flask, session, render_template, request, url_for, flash
+from flask import Flask, session, render_template, request, url_for, flash, jsonify
 from flask_session import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -168,6 +168,25 @@ def review(bookName):
         session ["author"] = bookDeets[0].author
         session ["year"] = bookDeets[0].year
     return render_template("review.html", bookName=bookName, isbn=session["isbn"], author=session["author"], rating=session["rating"], review=allReviews, year=session["year"])
+
+@app.route("/api/review/<string:bookName>")
+def review_api(bookName):
+    a = db.execute(text("SELECT * FROM books WHERE (title = :title)"),{"title": bookName}).fetchone()
+    if a is None:
+        return jsonify({"error": "Invalid flight_id"}), 422
+    book = db.execute(text("SELECT * FROM books WHERE (title = :title)"),{"title": bookName}).fetchall()
+    reviews = []
+    for b in book:
+        reviews.append(b.review)
+    return jsonify({
+        "title": book.title,
+        "author": book.author,
+        "isbn": book.isbn,
+        "year": book.year,
+        "rating": book.rating,
+        "reviews": reviews
+    })
+
 
 app.run(debug=True)
 

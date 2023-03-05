@@ -7,5 +7,5 @@ You are logged out
 {% block body %}
 <p>USER: {{session["username"]}}</p>
 <p> click below to login again</p>
-<a href = "/loginPage"> Login </a>
+<a href = "{{url_for('registration')}}"> Login </a>
 {% endblock %}
