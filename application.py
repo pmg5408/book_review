@@ -5,6 +5,7 @@ from flask_session import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.sql import text
+import json
 
 app = Flask(__name__)
 
@@ -27,72 +28,88 @@ db = scoped_session(sessionmaker(bind=engine))
 def index():
     return render_template("registration.html")
 
-@app.route("/registration", methods = ['GET', "POST"])
-def registration():
+#@app.route("/registration", methods = ['GET', "POST"])
+def registration(username, password, passwordAgain):
 
-    session ["username"] = request.form.get('username')
-    password = request.form.get('password')
-    passwordAgain = request.form.get('passwordAgain')
+    session["username"] = username
 
-    if session["username"] != None:
+    usernameExists = db.execute(text("SELECT username FROM userinfo where username = :un"), {"un": username}).fetchone()
+
+    if session["username"] and not usernameExists:
         if(password != passwordAgain):
-            return("passwords do not match. Try again!!")  
+            return False  
 
         db.execute(text("INSERT INTO userinfo (username, passwords) VALUES (:username, :passwords)"),
-                        {"username": session ["username"], "passwords": password}) 
+                        {"username": session["username"], "passwords": password}) 
         db.commit()
+    else: 
+        return False
 
-    return render_template("loginPage.html")
+    return True
 
-@app.route("/login", methods = ['GET', 'POST'])
-def loginPage():
-    session["username"] = request.form.get('username')
-    password = request.form.get('password')    
-    
+#@app.route("/login", methods = ['GET', 'POST'])
+def loginPage(username, password):
+    session["username"] = username   
     passwordCheck = db.execute(text("SELECT passwords FROM userinfo WHERE username = :un"),
-                                {"un":session["username"]}).fetchall()
-
-    if password == passwordCheck[0].passwords:
+                                {"un": session["username"]}).fetchone()
+    if passwordCheck and password == passwordCheck[0]:
         #error = 'Incorrect Password'
-        return render_template("searchPage.html")
-    return render_template("loginPage.html")
+        return True
+    return False
 
 @app.route("/logout")
 def logout():
     session["username"] = None
-    return render_template("logout.html")
+    return render_template("registration.html")
+
+@app.route("/login")
+def login():
+    return render_template("loginPage.html")
 
 @app.route("/search", methods = ['GET', 'POST'])
 def searchPage():
 
-    #API_KEY = 'AIzaSyAHSkjIjYwcFTViZ5g5J27ZRWEeXqV2j40'
+    if 'username' in request.form:
 
-    searchRes = []
+        username = request.form.get('username')
+        password = request.form.get('password')
+        if 'passwordAgain' in request.form:
+            if registration(username, password, request.form.get('passwordAgain')):
+                return render_template("searchPage.html")
+            else:
+                return("passwords do not match. Try again!!")
+        
+        else:
+            if loginPage(username, password):
+                return render_template("searchPage.html")
+            else:
+                return render_template("loginPage.html")
+
+    #API_KEY = 'AIzaSyAHSkjIjYwcFTViZ5g5J27ZRWEeXqV2j40'
+    bookResultsDict = []
 
     query = request.form.get('bookInfo')
     url = 'https://www.googleapis.com/books/v1/volumes?'
     res = requests.get(url, params={"q": {query}})
     data = res.json()
-#        title = data["items"]["volumeInfo"]["title"]
+
     if data != None:
+
         for i in data["items"]:
-            searchRes.append(i["volumeInfo"]["title"])
-
-#        print("here")
-    #print(q, url)
-    query = '%' + query + '%'
-    print(query)
-    #b = db.execute(text("SELECT title FROM books WHERE title = :query"),{"query": query}).fetchall()
-    books_db = db.execute(text("SELECT title FROM books WHERE title ILIKE (:query) OR author ILIKE (:query) OR isbn ILIKE (:query)"),
-                        {"query": query}).fetchall()
-
-    for book in books_db:
-        print("why")
-        searchRes.append(book.title)
+            if len(i["volumeInfo"]["industryIdentifiers"]) > 1:
+                if i["volumeInfo"]["industryIdentifiers"][0]["type"] == 'ISBN_10':
+                    ISBN = i["volumeInfo"]["industryIdentifiers"][0]["identifier"]
+                else:
+                    ISBN = i["volumeInfo"]["industryIdentifiers"][1]["identifier"]
+            else:
+                ISBN = i["volumeInfo"]["industryIdentifiers"][0]["identifier"]
+            try:
+                thumbnail = i["volumeInfo"]["imageLinks"]["smallThumbnail"]
+            except KeyError:
+                thumbnail = None
+            bookResultsDict.append({'title': i["volumeInfo"]["title"], 'authors':i["volumeInfo"]["authors"], 'googleID':i["id"], 'ISBN':ISBN, 'thumbnail':thumbnail})
         
-    print("hello")
-
-    return render_template("searchPage.html", searchRes = searchRes)
+    return render_template("searchPage.html", bookResultsDict=bookResultsDict)
 
   
 #   session["searchRes"] = []
@@ -102,90 +119,120 @@ def searchPage():
 
 
 
-@app.route("/review/<string:bookName>", methods = ['GET', 'POST'])
-def review(bookName):
+@app.route("/review/<string:googleID>", methods = ['GET', 'POST'])
+def review(googleID):
 
-    url = 'https://www.googleapis.com/books/v1/volumes?'
-    res = requests.get(url, params={"q": {bookName}})
+    url = 'https://www.googleapis.com/books/v1/volumes/' + googleID
+    res = requests.get(url)
     data = res.json()
-    session["id"] = data["items"][0]["id"]
-    session["author"] = data["items"][0]["volumeInfo"]["authors"]
-    session["year"] = data["items"][0]["volumeInfo"]["publishedDate"]
-    session["isbn"] = data["items"][0]["volumeInfo"]["industryIdentifiers"][0]["identifier"]
+
+    title = data["volumeInfo"]["title"]
+    author = data["volumeInfo"]["authors"]
+    year = data["volumeInfo"]["publishedDate"].split('-')[0]
+
+    try:
+        thumbnail = data["volumeInfo"]["imageLinks"]["smallThumbnail"]
+    except KeyError:
+        thumbnail = None    
+
+    try:
+        description = data["volumeInfo"]["description"]
+    except KeyError:
+        description = None
+    rating = None
+    review_users = None
+    review_reviews = None
+
+    if data["volumeInfo"]["industryIdentifiers"][0]["type"] == 'ISBN_10':
+        isbn = data["volumeInfo"]["industryIdentifiers"][0]["identifier"]
+    else:
+        isbn = data["volumeInfo"]["industryIdentifiers"][1]["identifier"]
 
     if request.method == 'POST':
-
-
-
-        rt = request.form.get('rating')
+        if request.form.get('rating') != '':
+            rt = float(request.form.get('rating'))
+        else:
+            rt = None
         rv = request.form.get('review')
 
-        a = db.execute(text("SELECT * FROM books WHERE (title = :title)"),
-                            {"title": bookName}).fetchone()
+        #rv = request.form.get('review')
 
+        book_db = db.execute(text("SELECT * FROM books WHERE (isbn=:isbn)"),
+                            {"isbn":isbn}).fetchone()
 
-        if session["rating"] == 0 and a != None:
+        if book_db:
+            if rv != '':
+                dummyDict = {}
+                if book_db[6]:
+                    dummyDict = book_db[6]
+                dummyDict[session["username"]] = rv
+                db.execute(text("UPDATE books SET review=:review WHERE isbn=:isbn"),
+                            {"review":json.dumps(dummyDict), "isbn":isbn})
 
-            db.execute(text("UPDATE books SET rating = :rating, review = :review, username = :username WHERE title = :bookName"),
-                        {"rating": rt, "review": rv, "username": session["username"], "bookName": bookName})
+            if rt:
+                if book_db[5][0]:
+                    rt = (rt + (float(book_db[5][0])*float(book_db[5][1])))/(float(book_db[5][1]) + 1)
+                    rt = round(rt, 2)
+                    db.execute(text("UPDATE books SET rating=:rating WHERE isbn=:isbn"),
+                                {"rating":[rt, float(book_db[5][1])+1], "isbn":isbn})
+                else:
+                    db.execute(text("UPDATE books SET rating=:rating WHERE isbn=:isbn"),
+                                {"rating":[rt, 1], "isbn":isbn})
+
         else:
-            print(bookName, session["username"])
-            t = db.execute(text("SELECT * FROM books WHERE (title = :title AND username = :un)"),
-                                {"title": bookName, "un": session["username"]}).fetchone()
-            if t is None:
+            print(isbn, title, author, year)
+            db.execute(text("INSERT INTO books (isbn, title, author, year, rating, review) VALUES (:isbn, :title, :author, :year, :rating, :review)"),
+            {"isbn":isbn, "title":title, "author":author, "year":year, "rating":[rt, 1], "review":{session["username"]:rv}})
 
-                db.execute(text("INSERT INTO books (isbn, title, author, year, rating, review, username) VALUES (:isbn, :title, :author, :year, :rating, :review, :username)"),
-                        {"isbn":session["isbn"], "title":bookName, "author":session["author"], "year": session["year"], "rating":rt, "review":rv, "username": session["username"]})
         db.commit()
 
-    bookDeets = db.execute(text("SELECT isbn, author, year FROM books WHERE title = :title LIMIT 1"),
-                                {"title": bookName}).fetchall()
 
-    rr = db.execute(text("SELECT review, rating FROM books WHERE title = :title"),
-                                {"title": bookName}).fetchall()
+    book_db = db.execute(text("SELECT rating, review FROM books WHERE isbn=(:isbn)"),
+                        {"isbn":isbn}).fetchone()
+    print(book_db)
+    if book_db:
+        rating = book_db[0][0]
+        if book_db:
+            review = book_db[1]
+            print(review)
 
-    
+    return render_template("review.html", title=title, isbn=isbn, authors=author, year=year, description=description, googleID=googleID, rating=rating, review=review, thumbnail=thumbnail)
 
-    allReviews = []
-    i = 0.0
-    rate = 0.0
-    if rr != []:
-        if rr[0].rating != 0 and rr[0].review !=0:
-            for r in rr:
-                i = i + 1.0
-                if r.rating != None:
-                    rate = float(r.rating) + rate
-                if r.review != None:
-                    allReviews.append(r.review)
-                print(r.review)
-            session["rating"] = rate/i
-        
-    else:
-        session["rating"] = 0
+@app.route("/api/bookName/<string:bookName>")
+def bookName_api(bookName):
+    books = db.execute(text("SELECT * FROM books WHERE title LIKE :title"),{"title": f"%{bookName}%"}).fetchall()
+    if not books:
+        return jsonify({"error": "A book with the given title does not exist in the database"}), 422
+    #book = db.execute(text("SELECT * FROM books WHERE title LIKE :title)"),{"title": bookName}).fetchall()
+    APIBooks = []
+    for book in books:
+        APIBooks.append({"Title": book[2], "ISBN": book[1], "Authors": book[3], "Year": book[4], "RatingsAndNumRatings": book[5], "ReviewsAndUsers": book[6]})
 
-    if bookDeets != []:
-        session["isbn"] = bookDeets[0].isbn
-        session ["author"] = bookDeets[0].author
-        session ["year"] = bookDeets[0].year
-    return render_template("review.html", bookName=bookName, isbn=session["isbn"], author=session["author"], rating=session["rating"], review=allReviews, year=session["year"])
+    return jsonify(APIBooks)
 
-@app.route("/api/review/<string:bookName>")
-def review_api(bookName):
-    a = db.execute(text("SELECT * FROM books WHERE (title = :title)"),{"title": bookName}).fetchone()
-    if a is None:
-        return jsonify({"error": "Invalid flight_id"}), 422
-    book = db.execute(text("SELECT * FROM books WHERE (title = :title)"),{"title": bookName}).fetchall()
-    reviews = []
-    for b in book:
-        reviews.append(b.review)
-    return jsonify({
-        "title": book.title,
-        "author": book.author,
-        "isbn": book.isbn,
-        "year": book.year,
-        "rating": book.rating,
-        "reviews": reviews
-    })
+@app.route("/api/ISBN/<string:ISBN>")
+def ISBN_api(ISBN):
+    books = db.execute(text("SELECT * FROM books WHERE isbn LIKE :ISBN"),{"ISBN": f"%{ISBN}%"}).fetchall()
+    if not books:
+        return jsonify({"error": "A book with the given ISBN does not exist in the database"}), 422
+    #book = db.execute(text("SELECT * FROM books WHERE title LIKE :title)"),{"title": bookName}).fetchall()
+    APIBooks = []
+    for book in books:
+        APIBooks.append({"Title": book[2], "ISBN": book[1], "Authors": book[3], "Year": book[4], "RatingsAndNumRatings": book[5], "ReviewsAndUsers": book[6]})
+
+    return jsonify(APIBooks)
+
+@app.route("/api/author/<string:Author>")
+def author_api(Author):
+    books = db.execute(text("SELECT * FROM books WHERE author LIKE :Author"),{"Author": f"%{Author}%"}).fetchall()
+    if not books:
+        return jsonify({"error": "A book with the given author does not exist in the database"}), 422
+    #book = db.execute(text("SELECT * FROM books WHERE title LIKE :title)"),{"title": bookName}).fetchall()
+    APIBooks = []
+    for book in books:
+        APIBooks.append({"Title": book[2], "ISBN": book[1], "Authors": book[3], "Year": book[4], "RatingsAndNumRatings": book[5], "ReviewsAndUsers": book[6]})
+
+    return jsonify(APIBooks)
 
 
 app.run(debug=True)

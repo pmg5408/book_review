@@ -1,28 +1,52 @@
 {% extends "layout.html" %}
 
 {% block heading %}
-Title: {{bookName}} 
+Title: {{title}} 
 {% endblock %}
 {% block body %}
-<p>user: {{session["username"]}}  <a href="{{url_for('logout')}}">Logout</a></p>
-<p>author: {{author}}</p>
-<p>year: {{year}}</p>
-<p>isbn: {{isbn}}</p>
-<p>rating(out of 5): {{rating}}</p>
-{%if review is not none%}
-<ul>
-<p>reviews:</p>
-    {% for a in review %}
-        <li><p>{{a}}</p></li>
-    {% endfor %}
-</ul>
-{% endif %}
+<div class="container"> 
 
-<p>submit a review below</p>
-<form action="{{url_for('review', bookName = bookName)}}" method="post">
-    <input type="text" name="review" placeholder="write here">
-    <input type="text" name="rating" placeholder="rate out of 5">
+    <div class="left-content">
+        Authors:
+        <ul>
+            {% for author in authors %} 
+            <li>{{ author }}</li>
+            {% endfor %}
+        </ul>
+        <p>Year: {{ year }}</p>
+        <p>ISBN: {{ isbn }}</p>
+        <p>Description: {{ description }}</p>
+        <p>Rating: {{ rating }}</p>
+        {% if review %}
+        <p>
+            Reviews:
+            <ul>
+                {% for r in review.keys() %}
+                <li>{{ r }} - {{ review[r] }}</li>
+                {% endfor %}
+            </ul>
+        </p>
+        {% endif %}
+    </div>
+
+    <div class="right-content"> 
+        <h3>User: {{ session["username"] }} </h3>
+        <a href="{{ url_for('logout') }}">Logout</a>
+        <p><img src="{{thumbnail}}" width="220px" height="auto"></p>
+    </div>
+
+</div>
+
+<p>Submit a review below</p>
+<form action="{{url_for('review', googleID=googleID)}}" method="post">
+    <input type="hidden" name="isbn" >
+    <input type="text" name="review" placeholder="Write here">
+    <input type="number" step="0.1" name="rating" placeholder="Rate out of 5" min="0" max="5">
     <button>Submit</button>
 </form> 
 
+<!--Code for reviews still needs to be added. 
+    Add try except for all the dictionary keys.
+    Clear out the value for rating so it doesn't keep getting submitted for every refresh. 
+-->
 {% endblock %}

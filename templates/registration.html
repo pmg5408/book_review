@@ -6,13 +6,13 @@ registration page
 
 {% block body %}
     <p> Enter the following to register: </p>
-    <form action="{{ url_for('registration') }}" method="post">
+    <form action="{{ url_for('searchPage') }}" method="post">
         <input type="text" name="username" placeholder="Enter a username">
         <input type="password" name="password" placeholder="enter a password">
         <input type="password" name="passwordAgain" placeholder="enter the above password again">
         <button>register</button>
     </form>
     <p>If you already have an account click below</p>
-    <a href = '/registration'> Login</a>
+    <a href = '/login'> Login</a>
 
 {% endblock %}

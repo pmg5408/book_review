@@ -16,12 +16,25 @@ BookReviews
     <button>Submit</button>
 </form> 
 
-{%if searchRes is not none%}
+{%if bookResultsDict is not none%}
 <ul>
-    {% for res in searchRes %}
-        <li><a href="{{url_for('review', bookName = res)}}">{{res}}</a></li>
+    {% for book in bookResultsDict %}
+        <li>
+            <p>
+                <a href="{{url_for('review', googleID=book.googleID)}}">{{book.title}}</a>
+                <br>ISBN: {{book.ISBN}}  
+                <br>Authors: 
+                {% for author in book.authors %} 
+                    <br>&nbsp;&nbsp;{{author}} 
+                {% endfor %}
+                {% if book.thumbnail %}
+                    <br><img src="{{book.thumbnail}}">
+                {% endif %}
+            </p>
+        </li>
     {% endfor %}
 </ul>
 {% endif %}
+
 {% endblock %}
 

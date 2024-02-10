@@ -1,0 +1,15 @@
+.container {
+    display: flex;
+    justify-content: space-between;
+}
+
+.left-content {
+    width: 60%; /* Adjust as needed */
+    text-align: left;
+}
+
+.right-content {
+    width: 40%; /* Adjust as needed */
+    text-align: right;
+    padding-right: 5%;
+}
